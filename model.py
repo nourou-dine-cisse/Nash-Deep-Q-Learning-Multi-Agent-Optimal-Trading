@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from collections import deque, namedtuple
 import numpy as np
-from buffer import Replaybuffer
+from buffer import ReplayBuffer
 import random
 
 
@@ -57,7 +57,7 @@ class AdvantageNet(nn.Module):
     Paper Section 6.2: 4 hidden layers x 32 nodes, SiLU.
     """
 
-    def __init__(self, d_state: int = 4, n_agents: int = 2,
+    def __init__(self, d_state: int = 4, n_agents: int = 5,
                  hidden: int = 32, perm_out: int = 32):
         super().__init__()
         self.n_agents = n_agents

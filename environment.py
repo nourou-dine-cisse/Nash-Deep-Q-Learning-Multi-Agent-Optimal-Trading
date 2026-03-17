@@ -1,5 +1,5 @@
 import numpy as np
-
+from model import AdvantageNet, ValueNet
 class TradingEnv:
     """
     Market simulator for the 2-agent optimal execution problem.
@@ -150,4 +150,41 @@ class TradingEnv:
             self.Y
         ], dtype=np.float32)
         
-        
+
+class TWAPAgent:
+    """
+    Time Weighted Average Price baseline.
+    Sells inventory uniformly across all time steps.
+    nu_i = q_{i,0} / T  (constant selling rate)
+    """
+    
+    def __init__(self, env):
+        self.rate = env.inv0[0] / env.T   # = 1.0 / 5.0 = 0.2
+    
+    def act(self, state):
+        # ignore state completely — always same action
+        return -self.rate   # negative = selling
+    
+    
+def compute_best_response(policy_other, env, advantage_net=None, value_net=None):
+    """
+    Week 1: returns TWAP as placeholder initial policy.
+    Week 2: replace body with analytical best-response
+            using AdvantageNet outputs (mu, L11, P12, P22).
+    """
+    return TWAPAgent(env)
+
+
+def fictitious_play(env, advantage_net, value_net, B=10):
+
+    # Init : TWAP as initial policy for all agents
+    policy_others = TWAPAgent(env)
+
+    for b in range(B):
+        # Step 2a : best response of focal agent (placeholder this week)
+        policy_0 = compute_best_response(policy_others, env, advantage_net, value_net)
+
+        # Step 2b : symmetry — all other agents adopt the same policy
+        policy_others = policy_0
+
+    return policy_0
