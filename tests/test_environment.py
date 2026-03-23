@@ -11,15 +11,33 @@ state = env.reset()
 done = False
 
 i = 0
+timestep_rewards = []   # collect rewards of all agents at each timestep
+
 while not done:
     actions = np.random.uniform(-1, 1, size=env.N)  # random actions for testing
     next_state, rewards, done = env.step(actions)
     print(f"Next state: {i}", next_state)
     print("Rewards:", rewards)
     print("Done:", done)
+    timestep_rewards.append(rewards.copy())   # shape (N,) per timestep
     i += 1
 
-import numpy as np
+timestep_rewards = np.array(timestep_rewards)  # (M, N)
+
+# Plot: reward of all agents across timesteps
+plt.figure(figsize=(8, 4))
+for agent_i in range(env.N):
+    plt.plot(timestep_rewards[:, agent_i], marker='o', linewidth=1.5,
+             label=f"Agent {agent_i}")
+plt.title("All Agents Reward per Timestep (random actions)")
+plt.xlabel("Timestep")
+plt.ylabel("Reward")
+plt.legend(fontsize=8)
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("all_agents_rewards.png", dpi=150)
+plt.show()
+
 
 env = TradingEnv()
 
@@ -51,39 +69,16 @@ print(f"Var(S_T)  = {var:.6f}")
 print(f"Expected  = {expected:.6f}")
 print(f"Ratio     = {var/expected:.3f}")  # should be between 0.95 and 1.05
 
-# --- Plot 1: sample Brownian motion paths ---------------------------------
+# Plot: sample Brownian motion paths
 timesteps = np.linspace(0, env.T, env.M + 1)
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-fig.suptitle("Brownian Motion Validation (kappa=rho=eta=gamma=0)", fontsize=13)
-
-ax1 = axes[0]
+plt.figure(figsize=(8, 4))
 for path in sample_paths:
-    ax1.plot(timesteps, path, alpha=0.5, linewidth=0.8)
-ax1.set_title(f"{N_SAMPLE_PLOT} Sample Price Paths")
-ax1.set_xlabel("Time t")
-ax1.set_ylabel("Price S(t)")
-ax1.grid(True, alpha=0.3)
-
-# --- Plot 2: histogram of final prices vs theoretical Gaussian -------------
-ax2 = axes[1]
-ax2.hist(final_prices, bins=80, density=True, color="steelblue",
-         alpha=0.7, label="Simulated S(T)")
-
-# overlay theoretical normal density N(S0, sigma^2 * T)
-S0  = sample_paths[0][0]
-std = np.sqrt(expected)
-xs  = np.linspace(min(final_prices), max(final_prices), 300)
-pdf = (1 / (std * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((xs - S0) / std) ** 2)
-ax2.plot(xs, pdf, color="crimson", linewidth=2,
-         label="N(S0, sigma^2 * T)")  # theoretical distribution
-
-ax2.set_title(f"Distribution of S(T) over {N_PATHS:,} episodes")
-ax2.set_xlabel("Final Price S(T)")
-ax2.set_ylabel("Density")
-ax2.legend()
-ax2.grid(True, alpha=0.3)
-
+    plt.plot(timesteps, path, alpha=0.5, linewidth=0.8)
+plt.title(f"{N_SAMPLE_PLOT} Sample Price Paths (kappa=rho=eta=gamma=0)")
+plt.xlabel("Time t")
+plt.ylabel("Price S(t)")
+plt.grid(True, alpha=0.3)
 plt.tight_layout()
-plt.savefig("brownian_validation.png", dpi=150)
+plt.savefig("brownian_paths.png", dpi=150)
 plt.show()

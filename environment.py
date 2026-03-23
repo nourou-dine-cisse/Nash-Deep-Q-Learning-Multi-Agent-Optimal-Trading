@@ -1,5 +1,7 @@
+import torch
 import numpy as np
-from model import AdvantageNet, ValueNet
+from model import *
+
 class TradingEnv:
     """
     Market simulator for the 2-agent optimal execution problem.
@@ -21,7 +23,7 @@ class TradingEnv:
         self.b3    = 0.0    # running inventory penalty (zero in Table 1)
 
         # --- Simulation settings ---
-        self.N  = 5               # number of agents
+        self.N  = 2               # number of agents
         self.T  = 5.0             # time horizon in hours
         self.M  = 10             # number of decision steps
         self.dt = self.T / self.M # time step size = 0.5
@@ -38,8 +40,8 @@ class TradingEnv:
         """
         self.S    = 10.0                 # initial mid-price
         self.Y    = 0.0                  # transient impact starts at zero
-        self.t    = 0.0                            # current time
-        self.inv  = np.ones(self.N)    # each agent starts with inventory = 1
+        self.t    = 0.0                  # current time
+        self.inv  = np.ones(self.N)      # each agent starts with inventory = 1
         self.inv0 = self.inv.copy()      # store initial inventory for _get_state()
 
         return self._get_state()
@@ -162,29 +164,53 @@ class TWAPAgent:
         self.rate = env.inv0[0] / env.T   # = 1.0 / 5.0 = 0.2
     
     def act(self, state):
-        # ignore state completely — always same action
+        # ignore state completely always same action
         return -self.rate   # negative = selling
-    
-    
-def compute_best_response(policy_other, env, advantage_net=None, value_net=None):
+
+
+class NashPolicy:
     """
-    Week 1: returns TWAP as placeholder initial policy.
-    Week 2: replace body with analytical best-response
-            using AdvantageNet outputs (mu, L11, P12, P22).
+    Wraps NashDQN to expose the same act(state) interface as TWAPAgent.
+    Used by fictitious_play after iteration 1.
     """
-    return TWAPAgent(env)
+    def __init__(self, nash_dqn, env):
+        self.nash_dqn = nash_dqn
+        self.env      = env
 
+    def act(self, state):
+        x   = torch.tensor(state, dtype=torch.float32).unsqueeze(0)  # (1, 4)
+        inv = torch.tensor(self.env.inv[:2], dtype=torch.float32).unsqueeze(0)  # (1, 2)
+        with torch.no_grad():
+            return self.nash_dqn.nash_action(x, inv)[0, 1].item()    
+    
+def compute_best_response(state, inv, u_other, adv_net):
+    """
+    Analytical best-response of agent 0 given opponent plays u_other.
+    Derived from dA/du_1 = 0 using AdvantageNet outputs.
+    """
+    x = torch.tensor(state, dtype=torch.float32).unsqueeze(0)   # (1, 4)
+    inventories = torch.tensor(inv[:2], dtype=torch.float32).unsqueeze(0)   # (1, 2)
 
-def fictitious_play(env, advantage_net, value_net, B=10):
+    mu, P11, P12, P22, psi = adv_net(x, inventories)
 
-    # Init : TWAP as initial policy for all agents
-    policy_others = TWAPAgent(env)
+    # dA_1/du_1 = -2*P11*(u1-mu1) - P12*(u2-mu2) = 0
+    u1_star = mu[:, 0] - (P12[:, 0] * (u_other - mu[:, 1])) / (2 * P11[:, 0])
+
+    return u1_star.item()
+def fictitious_play(env, nash_dqn, B=10):
+
+    policy_others = TWAPAgent(env)   # Init : TWAP as initial policy
 
     for b in range(B):
-        # Step 2a : best response of focal agent (placeholder this week)
-        policy_0 = compute_best_response(policy_others, env, advantage_net, value_net)
+        state = env.reset()
+        done  = False
 
-        # Step 2b : symmetry — all other agents adopt the same policy
-        policy_others = policy_0
+        while not done:
+            u_other        = policy_others.act(state)
+            u0             = compute_best_response(state, env.inv, u_other, nash_dqn.adv_net)
+            state, _, done = env.step(np.array([u0, u_other]))
 
-    return policy_0
+        # symmetry — opponent adopts Nash policy for next iteration
+        policy_others = NashPolicy(nash_dqn, env)
+
+    return policy_others
