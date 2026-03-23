@@ -1,16 +1,3 @@
-"""
-model.py — Student D, Week 2
-==============================
-Builds on Week 1 and adds:
-  - Real quadratic structure inside AdvantageNet
-  - Cholesky enforcement P11 > 0 at all times
-  - compute_advantage() implementing eq. (4.9) of the paper
-  - NashDQN: combines ValueNet + AdvantageNet -> Q(x, u)
-  - nash_action(): analytic Nash equilibrium action eq. (4.6)
-
-Reference: arXiv:1904.10554v2 — Casgrain, Ning & Jaimungal
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
